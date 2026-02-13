@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mi Dia Más Importante - Mapa Estelar</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap");
+
+      body {
+        margin: 0;
+        background-color: #050508;
+        color: #e0e0e0;
+        font-family: "Space Mono", monospace;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        position: relative;
+      }
+
+      body::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+          circle at center,
+          transparent 30%,
+          rgba(0, 0, 0, 0.8) 90%
+        );
+        pointer-events: none;
+        z-index: 5;
+      }
+
+      .frame {
+        position: absolute;
+        top: 25px;
+        bottom: 25px;
+        left: 25px;
+        right: 25px;
+        border: 2px solid rgba(255, 255, 255, 0.7);
+        pointer-events: none;
+        z-index: 10;
+        box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
+      }
+
+      .frame::after {
+        content: "";
+        position: absolute;
+        top: 6px;
+        bottom: 6px;
+        left: 6px;
+        right: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      canvas {
+        display: block;
+        z-index: 1;
+      }
+
+      .text-overlay {
+        position: absolute;
+        bottom: 10%;
+        width: 100%;
+        text-align: center;
+        pointer-events: none;
+        z-index: 20;
+        text-transform: uppercase;
+        text-shadow: 0 4px 15px black;
+      }
+
+      .text-overlay h2 {
+        font-size: 14px;
+        letter-spacing: 5px;
+        margin-bottom: 25px;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .text-overlay p {
+        font-size: 10px;
+        line-height: 2.2;
+        letter-spacing: 3px;
+        color: #aaa;
+        font-weight: 400;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="frame"></div>
+
+    <canvas id="starCanvas"></canvas>
+
+    <div class="text-overlay">
+      <h2>
+        Junto con estas estrellas,<br />comenzó una parte importante de nuestra
+        historia.
+      </h2>
+      <p>
+        CIELO ESTRELLADO — MANIZALES<br />
+        05°04′N 75°30′W<br />
+        7 DE SEPTIEMBRE DE 2025 — 14:00
+      </p>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("starCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.scale(dpr, dpr);
+
+      let scale = 0.85;
+      let offsetX = window.innerWidth / 2;
+      let offsetY = window.innerHeight / 2.3;
+      let isDragging = false;
+      let startX, startY;
+      let time = 0;
+
+      const MAP_RADIUS = 330;
+      const HOVER_COLOR = "#00f0ff";
+
+      const constellations = [
+        {
+          name: "URSA MINOR",
+          link: "https://en.wikipedia.org/wiki/Ursa_Minor",
+          cx: -20,
+          cy: -80,
+          currentScale: 1,
+          stars: [
+            [0, -50],
+            [-20, -70],
+            [-40, -60],
+            [-60, -80],
+            [-50, -100],
+            [-30, -90],
+          ],
+        },
+        {
+          name: "URSA MAJOR",
+          link: "https://en.wikipedia.org/wiki/Ursa_Major",
+          cx: -120,
+          cy: -200,
+          currentScale: 1,
+          stars: [
+            [-100, -180],
+            [-130, -190],
+            [-150, -170],
+            [-180, -180],
+            [-120, -220],
+            [-90, -230],
+            [-100, -180],
+          ],
+        },
+        {
+          name: "DRACO",
+          link: "https://en.wikipedia.org/wiki/Draco_(constellation)",
+          cx: 60,
+          cy: -130,
+          currentScale: 1,
+          stars: [
+            [20, -100],
+            [40, -130],
+            [80, -110],
+            [100, -140],
+            [60, -160],
+            [10, -140],
+            [-20, -110],
+          ],
+        },
+        {
+          name: "LEO",
+          link: "https://en.wikipedia.org/wiki/Leo_(constellation)",
+          cx: -200,
+          cy: 100,
+          currentScale: 1,
+          stars: [
+            [-180, 80],
+            [-220, 90],
+            [-240, 120],
+            [-200, 130],
+            [-180, 80],
+            [-160, 70],
+          ],
+        },
+        {
+          name: "VIRGO",
+          link: "https://en.wikipedia.org/wiki/Virgo_(constellation)",
+          cx: -130,
+          cy: 190,
+          currentScale: 1,
+          stars: [
+            [-130, 160],
+            [-170, 190],
+            [-140, 220],
+            [-120, 200],
+            [-100, 240],
+          ],
+        },
+        {
+          name: "GEMINI",
+          link: "https://en.wikipedia.org/wiki/Gemini_(constellation)",
+          cx: -250,
+          cy: -50,
+          currentScale: 1,
+          stars: [
+            [-240, -40],
+            [-270, -30],
+            [-260, -80],
+            [-230, -70],
+          ],
+        },
+        {
+          name: "PEGASUS",
+          link: "https://en.wikipedia.org/wiki/Pegasus_(constellation)",
+          cx: 200,
+          cy: -50,
+          currentScale: 1,
+          stars: [
+            [180, -20],
+            [240, -20],
+            [240, -80],
+            [180, -80],
+            [180, -20],
+            [150, 10],
+          ],
+        },
+        {
+          name: "ORION",
+          link: "https://en.wikipedia.org/wiki/Orion_(constellation)",
+          cx: 100,
+          cy: 200,
+          currentScale: 1,
+          stars: [
+            [80, 180],
+            [120, 180],
+            [100, 200],
+            [90, 230],
+            [110, 230],
+          ],
+        },
+        {
+          name: "CASSIOPEIA",
+          link: "https://en.wikipedia.org/wiki/Cassiopeia_(constellation)",
+          cx: 180,
+          cy: -220,
+          currentScale: 1,
+          stars: [
+            [150, -220],
+            [170, -250],
+            [190, -230],
+            [210, -260],
+            [230, -240],
+          ],
+        },
+      ];
+
+      const planets = [
+        { name: "VENUS", x: -160, y: 120, color: "#ffeeaa", size: 4 },
+        { name: "MARS", x: -90, y: 210, color: "#ff7777", size: 3.5 },
+        { name: "JUPITER", x: -260, y: -20, color: "#ffdbc7", size: 5 },
+      ];
+
+      const starField = [];
+      for (let i = 0; i < 2000; i++) {
+        const r = Math.random() * MAP_RADIUS * 1.05;
+        const theta = Math.random() * Math.PI * 2;
+
+        const colorType = Math.random();
+        let starColorRgb;
+        if (colorType > 0.9) starColorRgb = "255, 230, 200";
+        else if (colorType > 0.75) starColorRgb = "200, 230, 255";
+        else starColorRgb = "255, 255, 255";
+
+        starField.push({
+          x: Math.cos(theta) * r,
+          y: Math.sin(theta) * r,
+          baseSize: Math.random() * 1.6 + 0.2,
+          color: starColorRgb,
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+
+        time += 0.04;
+
+        // 1. FONDO ATMOSFÉRICO (Sutil Vía Láctea)
+        drawBackgroundGlow();
+
+        // 2. ESTRELLAS DE FONDO
+        starField.forEach((s) => {
+          const twinkle = Math.sin(time * 0.5 + s.phase);
+          const alpha = 0.25 + (twinkle + 1) * 0.25;
+          ctx.fillStyle = `rgba(${s.color},${alpha})`;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.baseSize, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // 3. CONSTELACIONES
+        constellations.forEach((c) => {
+          const targetScale = c.isHovered ? 1.12 : 1.0;
+          c.currentScale += (targetScale - c.currentScale) * 0.1;
+
+          const color = c.isHovered ? HOVER_COLOR : "rgba(255,255,255,0.35)";
+          const glow = c.isHovered ? 15 : 0;
+
+          ctx.save();
+          ctx.translate(c.cx, c.cy);
+          ctx.scale(c.currentScale, c.currentScale);
+          ctx.translate(-c.cx, -c.cy);
+
+          ctx.beginPath();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = c.isHovered ? 1.5 : 0.8;
+          ctx.shadowBlur = glow;
+          ctx.shadowColor = HOVER_COLOR;
+          c.stars.forEach((p, i) => {
+            if (i === 0) ctx.moveTo(p[0], p[1]);
+            else ctx.lineTo(p[0], p[1]);
+          });
+          ctx.stroke();
+
+          c.stars.forEach((p) => {
+            ctx.fillStyle = c.isHovered ? "#fff" : "rgba(255,255,255,0.7)";
+            ctx.beginPath();
+            ctx.arc(p[0], p[1], c.isHovered ? 3 : 1.8, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          ctx.shadowBlur = 0;
+          ctx.font = c.isHovered
+            ? "bold 10px 'Space Mono'"
+            : "9px 'Space Mono'";
+          ctx.fillStyle = c.isHovered ? HOVER_COLOR : "rgba(255,255,255,0.6)";
+          ctx.textAlign = "center";
+          ctx.fillText(c.name, c.cx, c.cy + 22);
+          ctx.restore();
+        });
+
+        // 4. PLANETAS
+        planets.forEach((p) => {
+          ctx.save();
+          ctx.shadowBlur = 12;
+          ctx.shadowColor = p.color;
+          ctx.fillStyle = p.color;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.arc(
+            p.x,
+            p.y,
+            p.size + 5 + Math.sin(time * 0.8) * 2,
+            0,
+            Math.PI * 2,
+          );
+          ctx.stroke();
+
+          ctx.font = "italic 8px 'Space Mono'";
+          ctx.fillStyle = p.color;
+          ctx.fillText(p.name, p.x + 8, p.y - 8);
+          ctx.restore();
+        });
+
+        // CLIP CIRCULAR (Ahora solo recorta las estrellas, no la brújula)
+        ctx.globalCompositeOperation = "destination-in";
+        ctx.beginPath();
+        ctx.arc(0, 0, MAP_RADIUS + 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = "source-over";
+
+        // 5. REJILLA TÉCNICA Y BRÚJULA (Se dibuja AL FINAL para que no se recorte)
+        drawTechnicalGrid();
+
+        ctx.restore();
+        requestAnimationFrame(draw);
+      }
+
+      function drawBackgroundGlow() {
+        ctx.save();
+        ctx.rotate(Math.PI / 4);
+        const gradient = ctx.createRadialGradient(0, 0, 50, 0, 0, MAP_RADIUS);
+        gradient.addColorStop(0, "rgba(15, 20, 40, 0.2)");
+        gradient.addColorStop(0.6, "rgba(10, 10, 20, 0.05)");
+        gradient.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = gradient;
+        ctx.scale(1.2, 0.6);
+        ctx.beginPath();
+        ctx.arc(0, 0, MAP_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawTechnicalGrid() {
+        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, MAP_RADIUS * 0.33, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, MAP_RADIUS * 0.66, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, MAP_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, MAP_RADIUS - 8, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 360; i += 5) {
+          const rad = (i * Math.PI) / 180;
+          const isMajor = i % 45 === 0;
+          const len = isMajor ? 12 : 6;
+          const color = isMajor
+            ? "rgba(255,255,255,0.6)"
+            : "rgba(255,255,255,0.2)";
+
+          ctx.strokeStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(rad) * MAP_RADIUS, Math.sin(rad) * MAP_RADIUS);
+          ctx.lineTo(
+            Math.cos(rad) * (MAP_RADIUS - len),
+            Math.sin(rad) * (MAP_RADIUS - len),
+          );
+          ctx.stroke();
+        }
+
+        // --- BRÚJULA ---
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const cardinalPoints = [
+          { text: "N", angle: -Math.PI / 2, type: "major" },
+          { text: "S", angle: Math.PI / 2, type: "major" },
+          { text: "E", angle: 0, type: "major" },
+          { text: "W", angle: Math.PI, type: "major" },
+          { text: "NE", angle: -Math.PI / 4, type: "minor" },
+          { text: "SE", angle: Math.PI / 4, type: "minor" },
+          { text: "SW", angle: (3 * Math.PI) / 4, type: "minor" },
+          { text: "NW", angle: (-3 * Math.PI) / 4, type: "minor" },
+        ];
+
+        cardinalPoints.forEach((point) => {
+          const textDistance = MAP_RADIUS + 25;
+          const x = Math.cos(point.angle) * textDistance;
+          const y = Math.sin(point.angle) * textDistance;
+
+          if (point.type === "major") {
+            ctx.font = "700 13px 'Space Mono'";
+            ctx.fillStyle = "#ffffff";
+          } else {
+            ctx.font = "400 10px 'Space Mono'";
+            ctx.fillStyle = "rgba(255,255,255,0.6)";
+          }
+          ctx.fillText(point.text, x, y);
+        });
+      }
+
+      function checkHover(mouseX, mouseY) {
+        let hoveringName = false;
+        let hoveringShape = false;
+
+        constellations.forEach((c) => {
+          const distShape = Math.hypot(mouseX - c.cx, mouseY - c.cy);
+          if (distShape < 55) {
+            c.isHovered = true;
+            hoveringShape = true;
+          } else {
+            c.isHovered = false;
+          }
+
+          const distTextX = Math.abs(mouseX - c.cx);
+          const distTextY = Math.abs(mouseY - (c.cy + 22));
+
+          if (distTextX < 35 && distTextY < 12) {
+            c.isTextHovered = true;
+            hoveringName = true;
+          } else {
+            c.isTextHovered = false;
+          }
+        });
+
+        if (hoveringName) canvas.style.cursor = "pointer";
+        else if (hoveringShape) canvas.style.cursor = "crosshair";
+        else if (isDragging) canvas.style.cursor = "grabbing";
+        else canvas.style.cursor = "default";
+      }
+
+      canvas.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mX = (e.clientX - rect.left - offsetX) / scale;
+        const mY = (e.clientY - rect.top - offsetY) / scale;
+
+        if (isDragging) {
+          offsetX = e.clientX - rect.left - startX;
+          offsetY = e.clientY - rect.top - startY;
+        } else {
+          checkHover(mX, mY);
+        }
+      });
+
+      canvas.addEventListener("mousedown", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mX = (e.clientX - rect.left - offsetX) / scale;
+        const mY = (e.clientY - rect.top - offsetY) / scale;
+
+        const clickedConst = constellations.find((c) => c.isTextHovered);
+        if (!clickedConst) {
+          isDragging = true;
+          startX = mX * scale;
+          startY = mY * scale;
+        }
+      });
+
+      canvas.addEventListener("mouseup", () => (isDragging = false));
+      canvas.addEventListener("mouseleave", () => (isDragging = false));
+
+      canvas.addEventListener("click", () => {
+        const target = constellations.find((c) => c.isTextHovered);
+        if (target) window.open(target.link, "_blank");
+      });
+
+      canvas.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          const zoomSpeed = 0.0008;
+          scale += e.deltaY * -zoomSpeed;
+          scale = Math.min(Math.max(0.5, scale), 3.5);
+        },
+        { passive: false },
+      );
+
+      window.addEventListener("resize", () => {
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        ctx.scale(dpr, dpr);
+        offsetX = window.innerWidth / 2;
+        offsetY = window.innerHeight / 2.3;
+      });
+
+      draw();
+    </script>
+  </body>
+</html>
